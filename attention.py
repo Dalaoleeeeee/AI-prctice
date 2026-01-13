@@ -13,6 +13,8 @@ class ScaledDotProductAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, query, key, value, mask=None):
+        print(query.shape, key.shape, value.shape, mask.shape)
+        
         """
         Args:
             query: [batch_size, num_heads, len_q, d_k]
