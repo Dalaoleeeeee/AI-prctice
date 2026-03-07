@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>蒙德里安拼图 MONDRIAN</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{overflow-x:hidden;overscroll-behavior:none}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;
+  background:#f8f4ec;display:flex;flex-direction:column;align-items:center;
+  min-height:100vh;min-height:100dvh;padding:10px 6px 20px;
+}
+.hdr{text-align:center;margin-bottom:6px}
+.hdr h1{font-size:clamp(22px,6vw,32px);font-weight:900;letter-spacing:6px;color:#111}
+.hdr small{font-size:11px;color:#aaa;letter-spacing:2px}
+.lvs{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+.lb{width:34px;height:34px;border:3px solid #111;background:#fff;font:900 13px/28px sans-serif;text-align:center;cursor:pointer;transition:.1s}
+.lb.on{background:#111;color:#fff}
+.lb.ok{background:#2d8a4e;color:#fff;border-color:#2d8a4e}
+.lb.ok.on{background:#111;border-color:#111}
+.lb:active{transform:scale(.9)}
+.info{display:flex;gap:12px;align-items:center;margin:5px 0;font:600 12px sans-serif;color:#666}
+.badge{padding:2px 10px;border-radius:10px;color:#fff;font-size:11px}
+.bg1{background:#2d8a4e}.bg2{background:#e8a820}.bg3{background:#d44}.bg4{background:#111}
+.tm{font-variant-numeric:tabular-nums}
+.sr{display:flex;gap:2px;justify-content:center;margin:3px 0}
+.sr span{font-size:18px;color:#ddd;transition:.3s}.sr span.on{color:#f5c518}
+
+/* 棋盘 */
+#board{display:grid;border:5px solid #111;background:#111;gap:3px;padding:3px;margin:8px auto;touch-action:none}
+.ce{background:#ebe6d8;transition:background .1s}
+.ce.hl{background:rgba(45,138,78,.3)}.ce.no{background:rgba(212,68,42,.25)}
+/* 预置方块带锁定样式 */
+.ce.locked{opacity:1;cursor:default}
+.ce.locked::after{content:'';display:block;width:100%;height:100%;opacity:.12;
+  background:repeating-linear-gradient(45deg,#000,#000 2px,transparent 2px,transparent 6px)}
+
+/* 蒙德里安色 */
+.cR{background:#cc2a2a}.cB{background:#1a3a8a}.cY{background:#e8c820}.cW{background:#e8e2d0}.cK{background:#222}
+
+/* 方块托盘 */
+#tray{margin:8px auto;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:min(380px,95vw);min-height:44px;padding:8px 10px;border:3px dashed #ccc;border-radius:8px;background:rgba(255,255,255,.35)}
+.pc{display:grid;gap:2px;padding:2px;cursor:grab;touch-action:none;border:2px solid #333;background:#333;border-radius:2px}
+.pc .c{border-radius:1px}
+#ghost{position:fixed;z-index:9999;pointer-events:none;display:none;gap:2px;padding:2px;border:2px solid #333;background:#333;border-radius:2px;opacity:.8;transform:scale(1.06);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+
+.bts{display:flex;gap:8px;margin:10px 0}
+.bt{padding:9px 16px;border:3px solid #111;background:#fff;font:700 12px sans-serif;cursor:pointer;letter-spacing:1px;transition:.1s}
+.bt:active{background:#111;color:#fff}
+.bt.p{background:#111;color:#fff}.bt.p:active{background:#333}
+
+/* 提示文字 */
+.hint{font-size:11px;color:#999;text-align:center;margin:2px 0;max-width:320px;line-height:1.5}
+
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center}
+.ov.show{display:flex}
+.md{background:#fff;border:5px solid #111;padding:24px 20px;text-align:center;width:min(280px,85vw)}
+.md h2{font-size:20px;margin-bottom:4px}
+.md p{font-size:12px;color:#666;margin:8px 0 16px}
+.md .sr span{font-size:26px}
+
+@keyframes fall{0%{transform:translateY(-10px) rotate(0);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+.cf{position:fixed;width:7px;height:7px;z-index:6000;pointer-events:none;animation:fall 1.5s ease-in forwards}
+@keyframes pop{0%{transform:scale(.8)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.pop{animation:pop .2s ease}
+</style>
+</head>
+<body>
+<div class="hdr"><h1>MONDRIAN</h1><small>蒙德里安拼图</small></div>
+<div class="lvs" id="lvs"></div>
+<div class="info">
+  <span class="badge" id="badge">简单</span>
+  <span class="tm" id="tm">00:00</span>
+  <span id="mv">0 步</span>
+</div>
+<div class="sr" id="sr"><span>★</span><span>★</span><span>★</span></div>
+<div class="hint">🔒 带斜纹的方块已锁定，用剩余方块填满棋盘！</div>
+<div id="board"></div>
+<div id="tray"></div>
+<div id="ghost"></div>
+<div class="bts">
+  <button class="bt" id="btnR">重置</button>
+  <button class="bt" id="btnU">撤销</button>
+  <button class="bt" id="btnA">💡答案</button>
+  <button class="bt p" id="btnN">下一关 →</button>
+</div>
+<div class="ov" id="ov">
+  <div class="md">
+    <h2 id="wt">🎨 完美！</h2>
+    <div class="sr" id="ws"></div>
+    <p id="wp"></p>
+    <button class="bt p" id="btnW">下一关 →</button>
+  </div>
+</div>
+
+<script>
+// ============ Mondrian Blocks ============
+// 真正的玩法：8×8 棋盘，预置几个固定方块（题目），用剩余方块填满
+// 11个方块：3个蓝色(起始块) + 8个其他色
+// 所有方块尺寸固定，每关只改变蓝色起始块位置
+
+const CLR={R:'cR',B:'cB',Y:'cY',W:'cW',K:'cK'};
+const DMAP={'入门':'bg1','简单':'bg1','中等':'bg2','困难':'bg3','大师':'bg4'};
+
+// 标准 Mondrian Blocks 方块集
+// 全部11个方块: 3蓝(固定) + 8彩色(玩家放)
+// 蓝色起始块: 1×1, 1×2, 1×3
+// 彩色方块: 各种尺寸填满剩余空间
+
+// 关卡定义方式:
+// full: 完整的8×8解法（-1=锁定蓝, 0~N=玩家方块）
+// locked: [{x,y,w,h,co}] 预置方块
+// free: [{w,h,co}] 可用方块
+
+function mkLevel(name, diff, rows, cols, locked, free, pt, pm) {
+  // Validate
+  const grid = Array.from({length:rows},()=>Array(cols).fill(0));
+  let lockedArea = 0;
+  locked.forEach(b => {
+    for(let r=b.y;r<b.y+b.h;r++) for(let c=b.x;c<b.x+b.w;c++) grid[r][c]=1;
+    lockedArea += b.w*b.h;
+  });
+  const freeArea = free.reduce((s,p)=>s+p[0]*p[1],0);
+  const total = rows*cols;
+  if(lockedArea+freeArea !== total) console.warn(`Level ${name}: ${lockedArea}+${freeArea}≠${total}`);
+  return {n:name,d:diff,r:rows,c:cols,locked,free,pt,pm};
+}
+
+const LVL = [
+  // ===== 入门 6×6=36 =====
+  // 预置12格，剩余24格
+  mkLevel('1','入门',6,6,
+    [{x:0,y:0,w:2,h:2,co:'B'},{x:4,y:0,w:2,h:2,co:'B'},{x:2,y:4,w:2,h:2,co:'B'}], // 4+4+4=12
+    [[2,2,'R'],[2,2,'Y'],[3,2,'W'],[3,2,'K'],[2,1,'R'],[1,2,'Y']], // 4+4+6+6+2+2=24
+    30,6),
+
+  mkLevel('2','入门',6,6,
+    [{x:1,y:1,w:2,h:1,co:'B'},{x:3,y:3,w:1,h:2,co:'B'},{x:0,y:4,w:2,h:1,co:'B'}], // 2+2+2=6
+    [[3,2,'R'],[2,3,'Y'],[3,1,'W'],[2,2,'K'],[1,3,'R'],[2,2,'W'],[1,1,'Y'],[2,1,'B']], // 6+6+3+4+3+4+1+2=29... need 30
+    35,8),
+
+  // Let me be more careful. 6×6=36, locked=6, free should=30
+  // Redo L2
+  mkLevel('3','简单',6,6,
+    [{x:0,y:0,w:1,h:3,co:'B'},{x:5,y:3,w:1,h:3,co:'B'}], // 3+3=6
+    [[3,2,'R'],[2,2,'Y'],[3,2,'W'],[2,2,'K'],[2,1,'R'],[2,3,'Y'],[3,1,'W'],[1,2,'K']], // 6+4+6+4+2+6+3+2=33... too much
+    40,8),
+
+  // OK let me just carefully compute all levels properly.
+];
+
+// Better approach: define full solution grids and extract locked/free
+function fromGrid(name,diff,grid,lockedIds,pt,pm){
+  const rows=grid.length, cols=grid[0].length;
+  const colors=['B','R','Y','W','K','R','B','Y','W','K','R','Y','W','K','B','R','Y'];
+  // Find all piece bounding boxes
+  const pm2={};
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const id=grid[r][c];
+    if(!pm2[id]) pm2[id]={id,minR:r,maxR:r,minC:c,maxC:c};
+    else{pm2[id].minR=Math.min(pm2[id].minR,r);pm2[id].maxR=Math.max(pm2[id].maxR,r);pm2[id].minC=Math.min(pm2[id].minC,c);pm2[id].maxC=Math.max(pm2[id].maxC,c);}
+  }
+
+  const locked=[], free=[];
+  const ids=Object.keys(pm2).map(Number).sort((a,b)=>a-b);
+  ids.forEach((id,i)=>{
+    const m=pm2[id];
+    const w=m.maxC-m.minC+1, h=m.maxR-m.minR+1;
+    const co=colors[i%colors.length];
+    if(lockedIds.includes(id)){
+      locked.push({x:m.minC,y:m.minR,w,h,co:'B'}); // locked always blue
+    } else {
+      free.push([w,h,co]);
+    }
+  });
+
+  const lv = mkLevel(name,diff,rows,cols,locked,free,pt,pm);
+  // Save solution: for each free piece, store its position from original grid
+  const solution = [];
+  ids.forEach((id,i)=>{
+    if(lockedIds.includes(id)) return;
+    const m=pm2[id];
+    solution.push({x:m.minC, y:m.minR, w:m.maxC-m.minC+1, h:m.maxR-m.minR+1});
+  });
+  lv.solution = solution;
+  return lv;
+}
+
+// Clear and rebuild levels with proper grids
+const LEVELS = [
+  // ===== 入门 6×6 =====
+  fromGrid('1','入门',[
+    [0,0,1,1,2,2],
+    [0,0,1,1,2,2],
+    [3,3,3,4,4,4],
+    [3,3,3,4,4,4],
+    [5,5,6,6,7,7],
+    [5,5,6,6,7,7],
+  ],[0,2,6],25,5), // lock pieces 0,2,6
+
+  fromGrid('2','入门',[
+    [0,0,0,1,1,2],
+    [0,0,0,1,1,2],
+    [3,3,4,4,5,5],
+    [3,3,4,4,5,5],
+    [6,6,6,7,7,7],
+    [6,6,6,7,7,7],
+  ],[0,5,7],30,5),
+
+  fromGrid('3','简单',[
+    [0,0,1,1,1,2],
+    [0,0,3,3,3,2],
+    [4,4,3,3,3,2],
+    [4,4,5,5,6,6],
+    [7,7,5,5,6,6],
+    [7,7,8,8,8,8],
+  ],[0,3,8],35,6),
+
+  // ===== 中等 7×7 =====
+  fromGrid('4','中等',[
+    [0,0,0,1,1,2,2],
+    [0,0,0,1,1,2,2],
+    [3,3,4,4,4,5,5],
+    [3,3,4,4,4,5,5],
+    [6,6,6,7,7,8,8],
+    [6,6,6,7,7,8,8],
+    [9,9,9,9,10,10,10],
+  ],[0,4,6],50,8),
+
+  fromGrid('5','中等',[
+    [0,0,1,1,2,2,2],
+    [0,0,1,1,2,2,2],
+    [0,0,3,3,4,4,4],
+    [5,5,3,3,6,6,6],
+    [5,5,7,7,6,6,6],
+    [8,8,7,7,9,9,9],
+    [8,8,10,10,9,9,9],
+  ],[0,3,9],55,8),
+
+  fromGrid('6','中等',[
+    [0,0,0,1,1,1,1],
+    [0,0,0,2,2,3,3],
+    [4,4,4,2,2,3,3],
+    [4,4,4,5,5,6,6],
+    [7,7,7,5,5,6,6],
+    [7,7,7,8,8,9,9],
+    [10,10,10,8,8,9,9],
+  ],[0,4,7],60,8),
+
+  // ===== 困难 8×8 =====
+  fromGrid('7','困难',[
+    [0,0,0,1,1,2,2,2],
+    [0,0,0,1,1,2,2,2],
+    [3,3,4,4,4,5,5,5],
+    [3,3,4,4,4,5,5,5],
+    [6,6,6,7,7,8,8,8],
+    [6,6,6,7,7,8,8,8],
+    [9,9,10,10,11,11,12,12],
+    [9,9,10,10,11,11,12,12],
+  ],[0,4,8],75,10),
+
+  fromGrid('8','困难',[
+    [0,0,0,0,1,1,2,2],
+    [0,0,0,0,1,1,2,2],
+    [3,3,4,4,4,5,5,5],
+    [3,3,4,4,4,5,5,5],
+    [6,6,6,7,7,8,8,8],
+    [6,6,6,7,7,9,9,9],
+    [10,10,11,11,11,12,12,12],
+    [10,10,11,11,11,12,12,12],
+  ],[0,4,6],80,10),
+
+  fromGrid('9','困难',[
+    [0,0,1,1,1,2,2,2],
+    [0,0,1,1,1,2,2,2],
+    [0,0,3,3,4,4,5,5],
+    [6,6,3,3,4,4,5,5],
+    [6,6,7,7,7,8,8,8],
+    [9,9,7,7,7,8,8,8],
+    [9,9,10,10,11,11,12,12],
+    [13,13,10,10,11,11,12,12],
+  ],[0,7,8],85,11),
+
+  // ===== 大师 8×8 更多锁定 =====
+  fromGrid('10','大师',[
+    [0,0,0,0,1,1,1,1],
+    [0,0,0,0,1,1,1,1],
+    [2,2,3,3,3,4,4,4],
+    [2,2,3,3,3,4,4,4],
+    [5,5,5,6,6,7,7,7],
+    [5,5,5,6,6,8,8,8],
+    [9,9,10,10,10,11,11,11],
+    [9,9,10,10,10,11,11,11],
+  ],[1,3,5,10],100,8),
+
+  fromGrid('11','大师',[
+    [0,0,0,1,1,2,2,2],
+    [0,0,0,1,1,2,2,2],
+    [3,3,4,4,4,5,5,5],
+    [3,3,4,4,4,5,5,5],
+    [6,6,6,7,7,8,8,8],
+    [6,6,6,7,7,8,8,8],
+    [9,9,10,10,11,11,12,12],
+    [9,9,10,10,11,11,12,12],
+  ],[0,2,4,8,11],100,8),
+
+  fromGrid('12','大师',[
+    [0,0,1,1,1,2,2,2],
+    [0,0,1,1,1,2,2,2],
+    [0,0,3,3,4,4,5,5],
+    [6,6,3,3,4,4,5,5],
+    [6,6,7,7,7,8,8,8],
+    [9,9,7,7,7,8,8,8],
+    [9,9,10,10,11,11,12,12],
+    [13,13,10,10,11,11,12,12],
+  ],[0,1,7,8,10,12],110,8),
+];
+
+// Shuffle free pieces per level
+LEVELS.forEach(lv=>{
+  const f=lv.free;
+  for(let i=f.length-1;i>0;i--){
+    const j=(i*7+lv.n.charCodeAt(0)*3)%(i+1);
+    [f[i],f[j]]=[f[j],f[i]];
+  }
+});
+
+// ============ 游戏状态 ============
+let S={li:0,rows:0,cols:0,grid:null,lockGrid:null,pieces:[],moves:0,hist:[],t0:null,el:0,tid:null,done:{}};
+try{const v=localStorage.getItem('m7');if(v)S.done=JSON.parse(v);}catch(e){}
+const $=id=>document.getElementById(id);
+const board=$('board'),tray=$('tray'),ghost=$('ghost');
+function save(){try{localStorage.setItem('m7',JSON.stringify(S.done))}catch(e){}}
+
+function renderLvs(){
+  const el=$('lvs');el.innerHTML='';
+  LEVELS.forEach((lv,i)=>{
+    const d=document.createElement('div');
+    d.className='lb'+(S.done[i]?' ok':'')+(i===S.li?' on':'');
+    d.textContent=lv.n;d.onclick=()=>load(i);el.appendChild(d);
+  });
+}
+
+function load(i){
+  S.li=i;const lv=LEVELS[i];
+  S.rows=lv.r;S.cols=lv.c;
+  S.grid=Array.from({length:S.rows},()=>Array(S.cols).fill(null));
+  S.lockGrid=Array.from({length:S.rows},()=>Array(S.cols).fill(null));
+
+  // Place locked pieces
+  lv.locked.forEach((b,li)=>{
+    for(let r=b.y;r<b.y+b.h;r++) for(let c=b.x;c<b.x+b.w;c++){
+      S.grid[r][c]='L'+li;
+      S.lockGrid[r][c]={co:b.co,lid:li};
+    }
+  });
+
+  S.pieces=lv.free.map((p,id)=>({id,w:p[0],h:p[1],co:p[2],placed:false,pr:-1,pc:-1}));
+  S.moves=0;S.hist=[];S.el=0;S.t0=null;
+  if(S.tid){clearInterval(S.tid);S.tid=null;}
+  $('badge').textContent=lv.d;$('badge').className='badge '+(DMAP[lv.d]||'bg1');
+  $('tm').textContent='00:00';$('mv').textContent='0 步';
+  setSr($('sr'),0);
+  drawBoard();drawTray();renderLvs();
+}
+
+function cellSz(){return Math.min(Math.floor((window.innerWidth-32)/S.cols),44);}
+
+function drawBoard(){
+  const cs=cellSz();
+  board.style.gridTemplateColumns=`repeat(${S.cols},${cs}px)`;
+  board.style.gridTemplateRows=`repeat(${S.rows},${cs}px)`;
+  board.innerHTML='';
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const d=document.createElement('div');
+    d.className='ce';d.dataset.r=r;d.dataset.c=c;
+    const lock=S.lockGrid[r][c];
+    if(lock){
+      d.classList.add(CLR[lock.co],'locked');
+    } else {
+      const v=S.grid[r][c];
+      if(v!==null&&typeof v==='number'){
+        d.classList.add(CLR[S.pieces[v].co]);
+      }
+    }
+    board.appendChild(d);
+  }
+}
+
+function drawTray(){
+  tray.innerHTML='';
+  S.pieces.forEach(p=>{if(!p.placed) tray.appendChild(mkPc(p));});
+}
+
+function mkPc(p){
+  const el=document.createElement('div');
+  el.className='pc';el.dataset.id=p.id;
+  const sz=Math.min(26,cellSz());
+  el.style.gridTemplateColumns=`repeat(${p.w},${sz}px)`;
+  el.style.gridTemplateRows=`repeat(${p.h},${sz}px)`;
+  for(let i=0;i<p.w*p.h;i++){
+    const c=document.createElement('div');
+    c.className='c '+CLR[p.co];c.style.width=sz+'px';c.style.height=sz+'px';
+    el.appendChild(c);
+  }
+  return el;
+}
+
+function setSr(el,n){el.querySelectorAll('span').forEach((s,i)=>s.classList.toggle('on',i<n));}
+function startTm(){S.t0=Date.now();S.tid=setInterval(()=>{S.el=Math.floor((Date.now()-S.t0)/1000);$('tm').textContent=fmtT(S.el);},500);}
+function fmtT(s){return`${String(s/60|0).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
+
+function canPut(p,r,c){
+  for(let dr=0;dr<p.h;dr++) for(let dc=0;dc<p.w;dc++){
+    if(r+dr>=S.rows||c+dc>=S.cols) return false;
+    if(S.grid[r+dr][c+dc]!==null) return false;
+  }
+  return true;
+}
+
+function doPut(p,r,c){
+  S.hist.push({t:'p',id:p.id,r,c});
+  for(let dr=0;dr<p.h;dr++) for(let dc=0;dc<p.w;dc++) S.grid[r+dr][c+dc]=p.id;
+  p.placed=true;p.pr=r;p.pc=c;
+  S.moves++;$('mv').textContent=S.moves+' 步';
+  drawBoard();drawTray();
+  for(let dr=0;dr<p.h;dr++) for(let dc=0;dc<p.w;dc++){
+    const idx=(r+dr)*S.cols+(c+dc);
+    if(board.children[idx]) board.children[idx].classList.add('pop');
+  }
+  checkWin();
+}
+
+function doRm(id){
+  const p=S.pieces[id];if(!p.placed) return;
+  for(let dr=0;dr<p.h;dr++) for(let dc=0;dc<p.w;dc++) S.grid[p.pr+dr][p.pc+dc]=null;
+  p.placed=false;p.pr=-1;p.pc=-1;
+}
+
+function checkWin(){
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++) if(S.grid[r][c]===null) return;
+  if(S.tid){clearInterval(S.tid);S.tid=null;}
+  const lv=LEVELS[S.li];
+  let stars=1;if(S.moves<=lv.pm) stars++;if(S.el<=lv.pt) stars++;
+  S.done[S.li]=Math.max(S.done[S.li]||0,stars);save();
+  setTimeout(()=>{confetti();showWin(stars);},200);
+}
+
+function showWin(s){
+  const titles=['','🧩 完成！','🎨 很棒！','✨ 完美！'];
+  $('wt').textContent=titles[s];
+  const ws=$('ws');ws.innerHTML='';
+  for(let i=0;i<3;i++){const sp=document.createElement('span');sp.className=i<s?'on':'';sp.textContent='★';ws.appendChild(sp);}
+  $('wp').textContent=`用时 ${fmtT(S.el)}，${S.moves} 步`;
+  $('ov').classList.add('show');renderLvs();
+}
+
+function confetti(){
+  const cs=['#c22','#1a3a8a','#e8c820','#eee','#111'];
+  for(let i=0;i<25;i++){
+    const d=document.createElement('div');d.className='cf';
+    d.style.left=Math.random()*100+'vw';d.style.background=cs[i%5];
+    d.style.animationDelay=(Math.random()*.6)+'s';d.style.animationDuration=(1.2+Math.random()*.8)+'s';
+    document.body.appendChild(d);setTimeout(()=>d.remove(),2500);
+  }
+}
+
+// ============ 拖拽 ============
+let drag=null;
+function getXY(e){return e.touches?[e.touches[0].clientX,e.touches[0].clientY]:[e.clientX,e.clientY];}
+
+function onStart(e){
+  const el=e.target.closest('.pc');if(!el) return;
+  e.preventDefault();
+  if(!S.t0) startTm();
+  const piece=S.pieces[+el.dataset.id];
+  const [x,y]=getXY(e);
+  const sz=Math.min(26,cellSz());
+  ghost.style.display='grid';
+  ghost.style.gridTemplateColumns=`repeat(${piece.w},${sz}px)`;
+  ghost.style.gridTemplateRows=`repeat(${piece.h},${sz}px)`;
+  ghost.innerHTML='';
+  for(let i=0;i<piece.w*piece.h;i++){
+    const c=document.createElement('div');c.className='c '+CLR[piece.co];
+    c.style.width=sz+'px';c.style.height=sz+'px';ghost.appendChild(c);
+  }
+  const gw=piece.w*(sz+2)+2,gh=piece.h*(sz+2)+2;
+  drag={piece,srcEl:el,ox:gw/2,oy:gh/2};
+  ghost.style.left=(x-drag.ox)+'px';ghost.style.top=(y-drag.oy-30)+'px';
+  el.style.opacity='.25';
+}
+
+function onMove(e){
+  if(!drag) return;e.preventDefault();
+  const [x,y]=getXY(e);
+  ghost.style.left=(x-drag.ox)+'px';ghost.style.top=(y-drag.oy-30)+'px';
+  clearHL();
+  const pos=getPos(x,y-30,drag.piece);
+  if(pos) hlCells(drag.piece,pos.r,pos.c,canPut(drag.piece,pos.r,pos.c));
+}
+
+function onEnd(){
+  if(!drag) return;clearHL();
+  const gl=parseFloat(ghost.style.left),gt=parseFloat(ghost.style.top);
+  const gw=ghost.offsetWidth,gh2=ghost.offsetHeight;
+  ghost.style.display='none';drag.srcEl.style.opacity='';
+  const pos=getPos(gl+gw/2,gt+gh2/2,drag.piece);
+  if(pos&&canPut(drag.piece,pos.r,pos.c)) doPut(drag.piece,pos.r,pos.c);
+  drag=null;
+}
+
+function getPos(x,y,piece){
+  const rect=board.getBoundingClientRect();
+  const pad=3,gap=3,cs=(rect.width-pad*2-(S.cols-1)*gap)/S.cols;
+  const rx=x-rect.left-pad,ry=y-rect.top-pad;
+  const halfW=(piece.w*(cs+gap)-gap)/2,halfH=(piece.h*(cs+gap)-gap)/2;
+  const col=Math.round((rx-halfW+cs/2)/(cs+gap)),row=Math.round((ry-halfH+cs/2)/(cs+gap));
+  if(row<0||col<0||row+piece.h>S.rows||col+piece.w>S.cols) return null;
+  return {r:row,c:col};
+}
+
+function hlCells(p,r,c,ok){
+  for(let dr=0;dr<p.h;dr++) for(let dc=0;dc<p.w;dc++){
+    if(r+dr<S.rows&&c+dc<S.cols) board.children[(r+dr)*S.cols+(c+dc)].classList.add(ok?'hl':'no');
+  }
+}
+function clearHL(){board.querySelectorAll('.hl,.no').forEach(c=>c.classList.remove('hl','no'));}
+
+board.addEventListener('click',function(e){
+  if(drag) return;const ce=e.target.closest('.ce');if(!ce) return;
+  const r=+ce.dataset.r,c=+ce.dataset.c;
+  if(S.lockGrid[r][c]) return; // Can't remove locked pieces!
+  const v=S.grid[r][c];if(v===null||typeof v!=='number') return;
+  const p=S.pieces[v];S.hist.push({t:'r',id:v,r:p.pr,c:p.pc});
+  doRm(v);S.moves++;$('mv').textContent=S.moves+' 步';drawBoard();drawTray();
+});
+
+document.addEventListener('touchstart',onStart,{passive:false});
+document.addEventListener('touchmove',onMove,{passive:false});
+document.addEventListener('touchend',onEnd);
+document.addEventListener('mousedown',onStart);
+document.addEventListener('mousemove',onMove);
+document.addEventListener('mouseup',onEnd);
+
+$('btnR').onclick=()=>load(S.li);
+$('btnU').onclick=()=>{
+  if(!S.hist.length) return;const a=S.hist.pop();
+  if(a.t==='p') doRm(a.id);
+  else{const p=S.pieces[a.id];for(let dr=0;dr<p.h;dr++) for(let dc=0;dc<p.w;dc++) S.grid[a.r+dr][a.c+dc]=p.id;p.placed=true;p.pr=a.r;p.pc=a.c;}
+  S.moves=Math.max(0,S.moves-1);$('mv').textContent=S.moves+' 步';drawBoard();drawTray();
+};
+$('btnA').onclick=()=>{
+  if(!confirm('确定要看答案吗？看了就没三星了哦 😏')) return;
+  // Reset board first
+  S.pieces.forEach(p=>{if(p.placed) doRm(p.id);});
+  S.moves=0; S.hist=[];
+  // Place each piece according to solution
+  const lv=LEVELS[S.li];
+  if(!lv.solution) return;
+  // Solution matches the original free piece order (before shuffle)
+  // We need to match by size: solution[i] has {x,y,w,h}, free pieces (before shuffle) had same order
+  // But pieces got shuffled. Match by w×h dimensions.
+  const solCopy=[...lv.solution];
+  const used=new Set();
+  solCopy.forEach(sol=>{
+    // Find a matching unplaced piece with same dimensions
+    for(const p of S.pieces){
+      if(used.has(p.id)) continue;
+      if(p.w===sol.w && p.h===sol.h){
+        doPut(p, sol.y, sol.x);
+        used.add(p.id);
+        break;
+      }
+    }
+  });
+  drawBoard();drawTray();
+};
+$('btnN').onclick=$('btnW').onclick=()=>{$('ov').classList.remove('show');load((S.li+1)%LEVELS.length);};
+
+window.addEventListener('resize',drawBoard);
+renderLvs();load(0);
+</script>
+</body>
+</html>
