@@ -34,7 +34,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .tm{font-variant-numeric:tabular-nums;font-size:14px;font-weight:700}
 /* Board */
 #board{display:grid;border:5px solid #222;background:#222;gap:3px;padding:3px;margin:8px auto;touch-action:none;border-radius:4px;box-shadow:0 12px 40px rgba(0,0,0,0.15)}
-.ce{background:#EBE6D8;border-radius:2px;transition:background .15s}
+.ce{background:#D8D2C0;border-radius:2px;transition:background .15s}
 .ce.hl{background:rgba(45,138,78,.25)}.ce.no{background:rgba(212,68,42,.2)}
 .ce.locked{cursor:default}
 /* Piece colors with gradient for Apple feel */
@@ -42,8 +42,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 .cBR{background:linear-gradient(180deg,#882020 0%,#701818 100%)}
 .cB{background:linear-gradient(180deg,#2248a0 0%,#1A3A8A 100%)}.cDB{background:linear-gradient(180deg,#1a3880 0%,#143070 100%)}
 .cY{background:linear-gradient(180deg,#f0d028 0%,#E8C820 100%)}
-.cW{background:linear-gradient(180deg,#faf5e8 0%,#F5F0E0 100%)}
-.cG{background:linear-gradient(180deg,#e8e8e8 0%,#DDD 100%)}
+.cW{background:linear-gradient(180deg,#faf5e8 0%,#F5F0E0 100%);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.15)}
+.cG{background:linear-gradient(180deg,#e8e8e8 0%,#DDD 100%);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.12)}
 .cK{background:linear-gradient(180deg,#333 0%,#222 100%)}
 /* Tray */
 #tray{margin:8px auto;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:min(400px,95vw);min-height:50px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,0.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.6)}
@@ -91,7 +91,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
   .glass{background:rgba(30,28,25,0.8);border-color:rgba(255,255,255,0.1)}
   .hdr h1{color:#f5f0e0}
   .info{color:#aaa}
-  .ce{background:#2a2722}
+  .ce{background:#3a3530}
   .tab{background:#2a2722;color:#aaa;border-color:#3a3835}.tab.on{background:#f5f0e0;color:#111;border-color:#f5f0e0}
   .lb{background:#2a2722;color:#ccc;border-color:#3a3835}
   .lb.on{background:#f5f0e0;color:#111;border-color:#f5f0e0}
@@ -131,6 +131,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
 <div class="bts">
   <button class="bt sec" onclick="undoMove()">↩ 撤销</button>
   <button class="bt sec" onclick="resetBoard()">🔄 重置</button>
+  <button class="bt sec" onclick="giveHint()">💡 提示</button>
   <button class="bt" onclick="showBattle()">⚔️ 对战</button>
 </div>
 
@@ -167,12 +168,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC'
     <div class="devlog">
       <h3>📋 用户指令时间线</h3>
       <div class="timeline">
-        <div class="entry"><span class="time">[08:06]</span> Dalaolee: 发来蒙德里安实物拼图照片 × 9张，问游戏开发完了吗</div>
-        <div class="entry"><span class="time">[08:06]</span> Dalaolee: 发来 GitHub Pages 404 截图，表示对上次开发结果失望</div>
-        <div class="entry"><span class="time">[08:11]</span> Dalaolee: 下达两个任务：①调整每日早报格式（AI内容前置，麦当劳一句话） ②研究蒙德里安拼图规则后汇报设计方案</div>
-        <div class="entry"><span class="time">[08:18]</span> Dalaolee: 要求网上搜方块尺寸和题库，在 GitHub/搜索引擎/skill源搜索；要苹果设计风格质感</div>
-        <div class="entry"><span class="time">[08:25]</span> Dalaolee: 明确核心场景——生成链接发微信好友、手机浏览器打开即玩；中国可访问；新增双人对战和开发日志功能</div>
-        <div class="entry"><span class="time">[08:28]</span> Dalaolee: 开发日志要包含指令总结；确认方案，下令开始开发</div>
+        <div class="entry"><span class="time">[08:11]</span> 下达两个任务：①调整每日早报格式（AI内容前置，麦当劳一句话） ②研究蒙德里安拼图规则后汇报设计方案</div>
+        <div class="entry"><span class="time">[08:18]</span> 方块尺寸和题库要在网上搜（GitHub/搜索引擎/skill源）；要 Apple 设计风格质感</div>
+        <div class="entry"><span class="time">[08:25]</span> 核心场景：生成链接发微信好友、手机浏览器打开即玩；中国可访问；新增双人对战和开发日志</div>
+        <div class="entry"><span class="time">[08:28]</span> 开发日志包含指令总结；确认方案，开始开发</div>
+        <div class="entry"><span class="time">[08:51]</span> 白色方块与棋盘底色混淆需区分；加逐步提示功能（不直接给答案，一步步引导）</div>
       </div>
 
       <h3>🛠️ 技术栈</h3>
@@ -554,6 +554,9 @@ function loadLevel(idx) {
   placedPieces = [];
   trayPieces = PIECES.movable.map((_,i) => i);
   history = [];
+  hintSolution = null;
+  hintOrder = [];
+  hintsGiven = 0;
   stopTimer();
   
   // Place fixed blocks
@@ -691,12 +694,23 @@ function onDragEnd(e) {
       sendBattleState();
     }
   } else {
-    // Return to original position
     if(fromBoard) {
-      const origPP = dragging;
-      place(boardState, origPP.origX, origPP.origY, w, h, pieceIdx+10);
-      placedPieces.push({pieceIdx, x:origPP.origX, y:origPP.origY, rotated});
-      renderBoard();
+      // Check if dropped outside the board area — return to tray
+      const boardRect = boardEl.getBoundingClientRect();
+      const inBoard = e.clientX >= boardRect.left && e.clientX <= boardRect.right &&
+                      e.clientY >= boardRect.top && e.clientY <= boardRect.bottom;
+      if(!inBoard) {
+        // Return piece to tray (user intentionally dragged it off)
+        history.push({action:'remove', pieceIdx, x:dragging.origX, y:dragging.origY, rotated});
+        renderBoard();
+        renderTray();
+        if(battleMode && conn) sendBattleState();
+      } else {
+        // Dropped in invalid board position — put it back where it was
+        place(boardState, dragging.origX, dragging.origY, w, h, pieceIdx+10);
+        placedPieces.push({pieceIdx, x:dragging.origX, y:dragging.origY, rotated});
+        renderBoard();
+      }
     }
     if(dragging._srcEl) dragging._srcEl.style.opacity = '1';
     renderTray();
@@ -902,6 +916,109 @@ function saveProgress(idx) {
 
 function loadProgress() {
   // Just load, UI updates happen in renderLevels
+}
+
+// ====== HINT SYSTEM ======
+let hintSolution = null; // cached solution for current level
+let hintOrder = []; // order to reveal pieces (largest/hardest first)
+let hintsGiven = 0;
+
+function solveCurrent() {
+  if(hintSolution) return hintSolution;
+  // Build board with only fixed blocks
+  const board = new Array(64).fill(0);
+  const puzzle = puzzles[currentLevel];
+  puzzle.fixed.forEach(f => {
+    const def = PIECES.fixed.find(d=>d.id===f.id);
+    const w = f.rotated ? def.h : def.w;
+    const h = f.rotated ? def.w : def.h;
+    place(board, f.x, f.y, w, h, -1);
+  });
+  const solutions = solve(board, PIECES.movable, 0);
+  if(solutions.length > 0) {
+    hintSolution = solutions[0];
+    // Build hint order: largest pieces first (they're harder to place)
+    const pieceAreas = PIECES.movable.map((p,i) => ({idx:i, area:p.w*p.h}));
+    pieceAreas.sort((a,b) => b.area - a.area);
+    hintOrder = pieceAreas.map(p => p.idx);
+    hintsGiven = 0;
+  }
+  return hintSolution;
+}
+
+function giveHint() {
+  const sol = solveCurrent();
+  if(!sol) { alert('此关暂无解法数据'); return; }
+  
+  // Find next piece to hint (skip already placed ones)
+  while(hintsGiven < hintOrder.length) {
+    const pIdx = hintOrder[hintsGiven];
+    const alreadyPlaced = placedPieces.find(pp => pp.pieceIdx === pIdx);
+    if(alreadyPlaced) {
+      // Check if it's in the correct position
+      const p = PIECES.movable[pIdx];
+      const solVal = pIdx + 10;
+      // Find where this piece is in the solution
+      let correct = true;
+      for(let i=0; i<64; i++) {
+        if(sol[i] === solVal) {
+          if(boardState[i] !== solVal) { correct = false; break; }
+        }
+      }
+      if(correct) { hintsGiven++; continue; }
+      // Wrong position - remove it first
+      removePieceFromBoard(pIdx);
+      renderBoard();
+      renderTray();
+    }
+    
+    // Place this piece at its solution position
+    const solVal = pIdx + 10;
+    let minX=8,minY=8,maxX=0,maxY=0;
+    for(let i=0; i<64; i++) {
+      if(sol[i] === solVal) {
+        const cx=i%8, cy=Math.floor(i/8);
+        minX=Math.min(minX,cx); minY=Math.min(minY,cy);
+        maxX=Math.max(maxX,cx); maxY=Math.max(maxY,cy);
+      }
+    }
+    const pw=maxX-minX+1, ph=maxY-minY+1;
+    const p = PIECES.movable[pIdx];
+    const rotated = (pw === p.h && ph === p.w);
+    
+    if(!timerRunning) startTimer();
+    
+    // Remove piece from tray if there, place on board
+    if(canPlace(boardState, minX, minY, pw, ph)) {
+      place(boardState, minX, minY, pw, ph, solVal);
+      placedPieces.push({pieceIdx: pIdx, x: minX, y: minY, rotated});
+      history.push({action:'place', pieceIdx: pIdx, x: minX, y: minY, rotated});
+      
+      // Flash the placed piece cells
+      renderBoard();
+      renderTray();
+      
+      // Highlight hint cells briefly
+      const cells = boardEl.children;
+      for(let i=0; i<64; i++) {
+        if(boardState[i] === solVal) {
+          cells[i].style.transition = 'box-shadow 0.3s';
+          cells[i].style.boxShadow = '0 0 0 3px #E8C820, inset 0 0 8px rgba(232,200,32,0.4)';
+          setTimeout(() => { cells[i].style.boxShadow = ''; }, 1500);
+        }
+      }
+      
+      hintsGiven++;
+      
+      if(checkWin()) onWin();
+      if(battleMode && conn) sendBattleState();
+      return;
+    }
+    
+    hintsGiven++;
+  }
+  
+  alert('已给出所有提示！');
 }
 
 // ====== BATTLE MODE (PeerJS) ======
